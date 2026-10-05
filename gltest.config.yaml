@@ -1,0 +1,8 @@
+networks:
+  default: studionet
+  studionet:
+    # Studionet ships ten generated development accounts via genlayer-test;
+    # no private key is stored in this repository.
+    chain_type: studionet
+paths:
+  contracts: contracts

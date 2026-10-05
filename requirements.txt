@@ -1,0 +1,2 @@
+# Contract linting / SDK validation (the contract itself has no runtime dependencies)
+genvm-linter>=0.11.0
