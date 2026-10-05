@@ -32,6 +32,7 @@ MAX_URL = 300
 MAX_SOURCE = 6000
 MAX_QUOTE = 300
 MIN_QUOTE = 12
+MIN_FRAGMENT = 8
 MAX_ATTEMPTS = 3
 MAX_SPEND_BPS_LIMIT = 5000
 MAX_SECONDS = 10 * 365 * 24 * 3600
@@ -75,8 +76,13 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+_WORDS_RE = re.compile(r"[\W_]+")
+_ELLIPSIS_RE = re.compile(r"\.{3,}|…")
+
+
 def _norm(text: str) -> str:
-    return " ".join(text.lower().split())
+    """Case-, whitespace-, markdown- and punctuation-insensitive form: just the words."""
+    return _WORDS_RE.sub(" ", text.lower()).strip()
 
 
 def _popcount(x: int) -> int:
@@ -197,8 +203,23 @@ def _qualifies(mask: int, claimed: int, min_criteria: int) -> bool:
 
 
 def _grounded(quote: str, snapshot: str) -> bool:
-    q = _norm(quote)
-    return len(q) >= MIN_QUOTE and q in _norm(snapshot)
+    """
+    Every excerpt in `quote` must appear, word for word, in the snapshot. Honest excerpting often
+    skips text, so excerpts may be joined with an ellipsis; EACH fragment must then be found on its
+    own, each must be substantial, and together they must reach MIN_QUOTE characters.
+    """
+    haystack = _norm(snapshot)
+    total = 0
+    found_any = False
+    for fragment in _ELLIPSIS_RE.split(quote):
+        piece = _norm(fragment)
+        if piece == "":
+            continue
+        if len(piece) < MIN_FRAGMENT or piece not in haystack:
+            return False
+        total += len(piece)
+        found_any = True
+    return found_any and total >= MIN_QUOTE
 
 
 def _validator_agrees(
@@ -251,8 +272,9 @@ def _build_prompt(kind, charter, plan, criteria, text, claimed, evidence) -> str
             "under the current plan AND the evidence supports it. VIOLATES if the purpose "
             "contradicts the charter. UNCLEAR if the evidence is insufficient or ambiguous. "
             "met_mask is an integer bitmask: bit i is 1 iff milestone `criteria[i]` is "
-            "demonstrably satisfied BY THE EVIDENCE. quote must be one verbatim excerpt of "
-            "at most 300 characters copied exactly from `evidence` that supports the verdict."
+            "demonstrably satisfied BY THE EVIDENCE. quote must be verbatim text of "
+            "at most 300 characters copied exactly from `evidence` that supports the verdict; if you "
+            "skip text between excerpts, join the excerpts with ' ... ' and never reword them."
         )
     payload = json.dumps(
         {

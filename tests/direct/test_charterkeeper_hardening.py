@@ -412,3 +412,84 @@ def test_views_never_open_a_nondet_round(world):
     world.c.is_active(org)
     world.c.charter_hash(org)
     assert len(world.vm._captured_validators) == before
+
+
+# ------------------------------------------------------- excerpt grounding
+class TestGrounding:
+    """`_grounded` decides whether an approval's excerpt really comes from the page."""
+
+    PAGE = (
+        "# Report\n\n**Release 2.0.0 of the Open Climate Data Toolkit is now publicly available** on the "
+        "registry.\n\nThe release ships with complete user documentation: an installation guide.\n\n"
+        "The entire code base is released under the MIT licence."
+    )
+
+    def g(self, quote, page=None):
+        return contract_module()._grounded(quote, self.PAGE if page is None else page)
+
+    def test_verbatim_excerpt(self, world):
+        assert self.g("The entire code base is released under the MIT licence.")
+
+    def test_markdown_and_punctuation_are_ignored(self, world):
+        assert self.g("Release 2.0.0 of the Open Climate Data Toolkit is now publicly available")
+        assert self.g("release 2 0 0 of the open climate data toolkit")
+
+    def test_ellipsis_joined_excerpts_are_each_checked(self, world):
+        quote = ("Release 2.0.0 of the Open Climate Data Toolkit ... complete user documentation ... "
+                 "released under the MIT licence")
+        assert self.g(quote)
+        assert self.g(quote.replace("...", "…"))
+        assert self.g(quote.replace("...", "...."))
+
+    def test_one_invented_fragment_poisons_the_whole_quote(self, world):
+        quote = ("Release 2.0.0 of the Open Climate Data Toolkit ... the founders waived the charter ... "
+                 "released under the MIT licence")
+        assert not self.g(quote)
+
+    def test_fragments_must_keep_their_words_in_the_page_not_just_nearby(self, world):
+        assert not self.g("Open Climate Data Toolkit released under an Apache licence")
+
+    def test_tiny_fragments_cannot_pad_a_quote(self, world):
+        # every word really is on the page and the total is long enough, but each fragment is
+        # under the per-fragment minimum, so the quote must still be refused
+        quote = "release ... MIT ... code ... base ... open"
+        assert all(w.strip() in self.PAGE.lower().replace("*", "") or w.strip().lower() in self.PAGE.lower()
+                   for w in quote.split("..."))
+        assert not self.g(quote)
+
+    @pytest.mark.parametrize("quote", ["", "   ", "...", "…", " ... ... ", "!!!???", "short"])
+    def test_empty_or_too_short_is_not_grounded(self, world, quote):
+        assert not self.g(quote)
+
+    def test_total_length_floor(self, world):
+        # a single genuine fragment that clears the per-fragment minimum (8) but not the total (12)
+        assert "toolkit is" in " ".join(self.PAGE.lower().split())
+        assert not self.g("Toolkit is")
+        assert self.g("Toolkit is now publicly")  # the same words, long enough, are fine
+
+    def test_unicode_text_is_supported(self, world):
+        page = "Informe: la versión 2.0 está publicada con documentación completa."
+        assert self.g("la versión 2.0 está publicada", page)
+        assert not self.g("la versión 3.0 está publicada", page)
+
+    def test_empty_snapshot_grounds_nothing(self, world):
+        assert not self.g("The entire code base is released under the MIT licence.", "")
+
+
+def test_ellipsis_excerpt_from_a_real_resolve_is_accepted(world):
+    """Regression for the live-network defect: honest models stitch excerpts together with '...'."""
+    org = world.make_org()
+    pid = world.spend_proposal(org)
+    quote = f"{GOOD_QUOTE.split(' published')[0]} ... full docs"
+    assert world.resolve(pid, llm=verdict_json("CONFORMS", 0b111, quote=quote)) == "EXECUTED"
+
+
+def test_forged_leader_with_a_partly_invented_stitched_quote_is_rejected(world):
+    org = world.make_org()
+    pid = world.spend_proposal(org)
+    world.resolve(pid)
+    world.reset_mocks()
+    world.vm.mock_web(r"example\.org", {"method": "GET", "status": 200, "body": GOOD_PAGE})
+    world.vm.mock_llm(r"CHARTERKEEPER_JUDGE", verdict_json())
+    forged = leader(quote="Release 1.0 published under the MIT licence ... all funds go to the founder")
+    assert world.vm.run_validator(leader_result=forged) is False

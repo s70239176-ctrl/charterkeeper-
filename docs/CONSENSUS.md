@@ -28,8 +28,8 @@ and the criteria floor from the charter. The model can neither choose nor change
 1. Fetch the evidence (SPEND only). Unreachable or non-200 -> envelope `verdict=UNAVAILABLE`, no model call.
 2. Build the prompt: instructions first, then the payload as **JSON** (`json.dumps`) so attacker text is data.
 3. Call the model; parse strictly (see below). Unparseable -> `UNCLEAR`.
-4. If the verdict is `CONFORMS` for a spend but the quoted excerpt is not found verbatim in the leader's own
-   snapshot, downgrade to `UNCLEAR` (an ungrounded approval is never an approval).
+4. If the verdict is `CONFORMS` for a spend but the quoted excerpt is not grounded in the leader's own
+   snapshot (see "Excerpt grounding" below), downgrade to `UNCLEAR` (an ungrounded approval is never an approval).
 5. Return the envelope `{reachable, verdict, met_mask, injection, quote, parsed}`.
 
 ## Validator (`_validator_agrees`)
@@ -41,8 +41,8 @@ The validator does **not** just check JSON shape. It repeats steps 1-4 on its ow
 3. requires equal `verdict` and equal `injection`;
 4. for spends, requires that both sides agree on whether the **claimed criteria floor** is met
    (`popcount(met_mask & claimed) >= min_criteria`);
-5. for a leader `CONFORMS` spend, requires the leader's `quote` to appear (whitespace/case-normalised, at least
-   12 characters) in the **validator's own snapshot**.
+5. for a leader `CONFORMS` spend, requires the leader's `quote` to be grounded in the **validator's own
+   snapshot** (see "Excerpt grounding").
 
 A forged leader that claims `CONFORMS` where the validator sees `VIOLATES`, `UNCLEAR`, an injection, an unreachable
 page, fewer qualifying criteria, or an invented excerpt, is rejected. These cases are covered by
@@ -58,6 +58,22 @@ Why: those are the only dimensions that change a state transition. The diagnosti
 value on their own, so forcing identical bits would only create needless disagreement between honest validators.
 
 `strict_eq` is deliberately **not** used: raw model output is not stable under it.
+
+## Excerpt grounding
+
+An approval must be backed by words that are really on the page, checked by deterministic code (`_grounded`):
+
+- text is compared as **words only**: lower-cased, with markdown, punctuation and whitespace ignored;
+- the quote may contain several excerpts joined by an ellipsis (`...` or the single ellipsis character), because
+  honest excerpting skips text;
+- **every** fragment must be found, word for word, in the snapshot; one invented fragment sinks the whole quote;
+- each fragment must be at least 8 characters and the fragments together at least 12, so tiny fragments cannot be
+  used as padding.
+
+This rule was tightened *and* loosened by live evidence. The first version demanded one contiguous substring; on
+real Studionet validators the model gave the correct verdict every time but sometimes stitched excerpts with
+"...", so honest approvals were downgraded to `UNCLEAR` (fail closed, but needlessly fragile). The fix accepts
+ellipsis-joined fragments while keeping the requirement that every word of every fragment is on the page.
 
 ## Type hardening of the leader result
 

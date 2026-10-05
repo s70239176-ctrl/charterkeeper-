@@ -37,7 +37,7 @@ CharterKeeper is a Studionet development-network contribution. It has had automa
 
 | Attack | Mitigation | Test |
 |---|---|---|
-| Prompt injection in an evidence page | Instructions precede a JSON payload; the judge must flag `injection`; a flagged result can never pay (`UNCLEAR`); an excerpt must be verbatim in each validator's own snapshot | `test_hostile_evidence_is_json_framed...`, `test_injection_flag_fails_closed...` |
+| Prompt injection in an evidence page | Instructions precede a JSON payload; the judge must flag `injection`; a flagged result can never pay (`UNCLEAR`); every excerpt fragment must be found word-for-word in each validator's own snapshot | `test_hostile_evidence_is_json_framed...`, `test_injection_flag_fails_closed...` |
 | Forged semantic output from the leader | Custom validator re-observes and compares the settlement-critical dimensions; shape-only forgeries are rejected | `TestForgedLeader` (37 cases) |
 | Type confusion (bool-as-int, float, hex string, unknown enum/bit) | Exact `type(x) is ...` checks and range checks; anything off becomes `UNCLEAR` | `HOSTILE_OUTPUTS`, `TestParseJudgment`, `TestEnvelopeShape` |
 | SSRF / hostile URLs | HTTPS only; no credentials, ports, IPs, `localhost`, `.local`, `.internal`; DNS-label validation; length cap | `test_hostile_or_malformed_urls_are_rejected` |
@@ -60,7 +60,7 @@ the suite caught 16. The 17th was a genuinely redundant duplicate cap check, whi
 | Source unreachable | `UNAVAILABLE` - no state change besides an attempt counter |
 | Model output unparseable, out of range, or the call raises | `UNCLEAR` - no payout, no plan change |
 | Injection flagged | `UNCLEAR` |
-| Excerpt not found in the snapshot | `UNCLEAR` |
+| Any excerpt fragment not found in the snapshot | `UNCLEAR` |
 | Criteria floor not met | `INSUFFICIENT` - no payout |
 | Validators cannot agree | Transaction not accepted - no state change |
 | Funding below reserve | `DORMANT`: no proposals, no resolutions, funding revives |
