@@ -113,7 +113,7 @@ def resolve_until_settled(contract, pid):
     for _ in range(MAX_ATTEMPTS * 3):
         p = read(lambda: contract.get_proposal(args=[pid]).call())
         if p["status"] != "PENDING":
-            print(f"SETTLED {p['status']} {p['verdict']} after {int(p['attempts']) + 1} judged round(s); earlier: {intermediate}")
+            print(f"SETTLED {p['status']} {p['verdict']} after {len(intermediate) + 1} resolve round(s); earlier: {intermediate}")
             return p, intermediate
         try:
             send(contract.resolve, [pid])
