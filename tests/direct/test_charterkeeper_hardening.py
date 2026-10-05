@@ -493,3 +493,17 @@ def test_forged_leader_with_a_partly_invented_stitched_quote_is_rejected(world):
     world.vm.mock_llm(r"CHARTERKEEPER_JUDGE", verdict_json())
     forged = leader(quote="Release 1.0 published under the MIT licence ... all funds go to the founder")
     assert world.vm.run_validator(leader_result=forged) is False
+
+
+# ------------------------------------------------------------- deployability
+def test_contract_source_is_pure_ascii():
+    """
+    gltest's deploy path ships the source as ASCII; a single stray non-ASCII character (for
+    example a typographic ellipsis) makes every live deployment fail at schema extraction.
+    """
+    from pathlib import Path
+
+    source = Path("contracts/charterkeeper.py").read_text(encoding="utf-8")
+    offenders = [(n, line) for n, line in enumerate(source.splitlines(), 1) if not line.isascii()]
+    assert not offenders, f"non-ASCII characters on lines {[n for n, _ in offenders]}"
+    assert "\r" not in source, "contract must use LF line endings so it matches its git blob"

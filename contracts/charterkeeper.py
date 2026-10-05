@@ -77,7 +77,7 @@ def _sha(text: str) -> str:
 
 
 _WORDS_RE = re.compile(r"[\W_]+")
-_ELLIPSIS_RE = re.compile(r"\.{3,}|…")
+_ELLIPSIS_RE = re.compile(r"[.]{3,}|" + chr(0x2026))
 
 
 def _norm(text: str) -> str:

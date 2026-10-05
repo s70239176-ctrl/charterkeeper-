@@ -62,9 +62,17 @@ def random_address() -> str:
     return "0x" + secrets.token_hex(20)
 
 
-def deploy():
-    factory = get_contract_factory(contract_file_path="charterkeeper.py")
-    return factory.deploy(account=get_default_account(), consensus_max_rotations=ROTATIONS)
+def deploy(retries=4):
+    """Deploy a disposable contract. Studio's schema endpoint occasionally fails transiently; retry setup only."""
+    for attempt in range(retries):
+        try:
+            factory = get_contract_factory(contract_file_path="charterkeeper.py")
+            return factory.deploy(account=get_default_account(), consensus_max_rotations=ROTATIONS)
+        except Exception as exc:  # noqa: BLE001 - infrastructure hiccup, not a contract result
+            if attempt == retries - 1:
+                raise
+            print(f"DEPLOY-RETRY {type(exc).__name__}: {str(exc)[:70]}")
+            time.sleep(15)
 
 
 def send(method, args, value=0):
