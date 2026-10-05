@@ -16,7 +16,7 @@ sys.path.insert(0, "tests/integration")
 import test_charterkeeper_studionet as t  # noqa: E402
 from gltest import get_contract_factory, get_default_account  # noqa: E402
 from gltest.assertions import tx_execution_succeeded  # noqa: E402
-from gltest.contracts.utils import extract_contract_address  # noqa: E402
+from gltest.utils import extract_contract_address  # noqa: E402
 from genlayer_py.types import TransactionStatus  # noqa: E402
 
 

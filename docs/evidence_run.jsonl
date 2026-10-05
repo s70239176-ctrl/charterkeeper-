@@ -1,0 +1,20 @@
+{"step": "deploy", "deployer": "0x5Abd35556C575b304ed48733D808083C5353AbE5", "address": "0x92597B7a2676fdA74eF772bBC95D124853d91240", "tx": "0xfb5fd7cb176fea538058267dde38a93486ae3cf773b1c0928341e88d36820bf6", "status": "FINALIZED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "idle", "idle"]}
+{"step": "A.org", "org_id": 1, "balance": 1000, "charter_hash": "d3c84aa804ae3356456cc3db4d0e5727ec3f90bb28b60fa95fc0fb88816c1fb5", "status": "ACTIVE"}
+{"step": "A.spend.resolve#1", "tx": "0x66982366583aa6b8d8ec0db20a75490d07f7ec83b307b308f9e217777bf527ee", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "idle", "idle"]}
+{"step": "A.spend.state#1", "status": "EXECUTED", "verdict": "CONFORMS", "attempts": 0, "met_mask": 7, "amount": 100, "bond": 0}
+{"step": "A.result", "balance": 900, "authorized": true}
+{"step": "B.hostile.resolve#1", "tx": "0x3e81e5078a3cf3eec32ba96e85100f7a340ded9bc632c1eb33e7661a721df40b", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "disagree", "idle"]}
+{"step": "B.hostile.state#1", "status": "PENDING", "verdict": "UNCLEAR", "attempts": 1, "met_mask": 0, "amount": 100, "bond": 5}
+{"step": "B.hostile.resolve#2", "tx": "0x1b0cf8a48bfd15970d2afdcfd000a5c4502cc08127c830130e380f16281eaedc", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "disagree", "idle"]}
+{"step": "B.hostile.state#2", "status": "PENDING", "verdict": "UNCLEAR", "attempts": 2, "met_mask": 0, "amount": 100, "bond": 5}
+{"step": "B.hostile.resolve#3", "tx": "0xfc12c4217270626962e529a2cc0e12ab85a7fcd60c3c7826ca61c392f24e3d79", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "disagree", "idle"]}
+{"step": "B.hostile.state#3", "status": "EXPIRED", "verdict": "UNCLEAR", "attempts": 3, "met_mask": 0, "amount": 100, "bond": 0}
+{"step": "B.result", "balance": 1000, "authorized": false}
+{"step": "C.spend.resolve#1", "tx": "0x4f356e005db423a0be48b4e98ddfbd21704118b3df97597dce26199b9d0431b2", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "idle", "idle"]}
+{"step": "C.spend.state#1", "status": "EXECUTED", "verdict": "CONFORMS", "attempts": 0, "met_mask": 7, "amount": 60, "bond": 0}
+{"step": "C.dormant", "status": "DORMANT", "balance": 60, "dormant_since": 1791168853}
+{"step": "C.heartbeat", "tx": "0xe2b149723a3d44b232c6b07166128d4adffaefe05c547e77b4080d042ef71c15", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "agree", "agree"]}
+{"step": "C.dissolved", "status": "DISSOLVED", "refund_pool": 60, "refund_total": 120}
+{"step": "C.claim_refund", "tx": "0xef517eb96544b1c9c60038f53f32044c25c7fe7ca8f90c1bb5fd7c415b991a1c", "status": "ACCEPTED", "result": "MAJORITY_AGREE", "rounds": "1", "votes": ["agree", "agree", "agree", "idle", "idle"]}
+{"step": "C.refunded", "refund_pool": 0, "refund_total": 0}
+{"step": "done", "address": "0x92597B7a2676fdA74eF772bBC95D124853d91240", "org_count": 3, "proposal_count": 3}

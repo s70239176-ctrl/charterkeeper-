@@ -75,11 +75,34 @@ def deploy(retries=4):
             time.sleep(15)
 
 
-def send(method, args, value=0):
-    """Submit a write and assert the transaction itself executed (never trust setup blindly)."""
-    receipt = method(args=args).transact(value=value, consensus_max_rotations=ROTATIONS)
-    assert tx_execution_succeeded(receipt), f"{receipt.get('status_name')} / {receipt.get('result_name')}"
-    return receipt
+WAIT_INTERVAL_MS = 5000
+WAIT_RETRIES = 90  # about 7.5 minutes: a slow transaction is awaited, not abandoned and resent
+
+
+def send(method, args, value=0, landed=None, attempts=3):
+    """
+    Submit a write and assert the transaction itself executed (never trust setup blindly).
+
+    A transport error (gateway HTML page, dropped connection) does not say whether the write reached the
+    network. If `landed` is given, the effect is checked on-chain before any resend, so a retry can never
+    duplicate a write. A transaction that executes and FAILS is not swallowed: it raises AssertionError.
+    """
+    for attempt in range(attempts):
+        try:
+            receipt = method(args=args).transact(
+                value=value, consensus_max_rotations=ROTATIONS,
+                wait_interval=WAIT_INTERVAL_MS, wait_retries=WAIT_RETRIES,
+            )
+        except Exception as exc:  # noqa: BLE001 - transport/timeout, not a contract result
+            print(f"SEND-RETRY {type(exc).__name__}: {str(exc)[:400]}")
+            time.sleep(8)
+            if landed is not None and read(landed):
+                return None
+            if attempt == attempts - 1:
+                raise
+            continue
+        assert tx_execution_succeeded(receipt), f"{receipt.get('status_name')} / {receipt.get('result_name')}"
+        return receipt
 
 
 def create_org(contract, **overrides):
@@ -90,12 +113,13 @@ def create_org(contract, **overrides):
     )
     params.update(overrides)
     value = params.pop("value")
+    before = int(read(lambda: contract.org_count(args=[]).call()))
     send(contract.create_org, [
         params["name"], params["charter"], params["criteria"], params["plan"],
         params["min_reserve"], params["max_spend_bps"], params["spend_cooldown"],
         params["grace"], params["min_criteria"], params["proposal_bond"],
         params["proposal_window"], params["successor"],
-    ], value=value)
+    ], value=value, landed=lambda: int(contract.org_count(args=[]).call()) > before)
     org_id = int(read(lambda: contract.org_count(args=[]).call()))
     assert org_id >= 1
     assert read(lambda: contract.get_org(args=[org_id]).call())["status"] == "ACTIVE"
@@ -119,9 +143,7 @@ def resolve_until_settled(contract, pid):
             send(contract.resolve, [pid])
         except AssertionError:
             raise
-        except Exception as exc:  # noqa: BLE001 - gateway/transport hiccup; state is re-read next loop
-            print(f"SEND-RETRY {type(exc).__name__}: {str(exc)[:70]}")
-            time.sleep(8)
+        except Exception:  # noqa: BLE001 - send() already logged and retried; re-read state and loop
             continue
         after = read(lambda: contract.get_proposal(args=[pid]).call())
         if after["status"] == "PENDING":
@@ -131,8 +153,21 @@ def resolve_until_settled(contract, pid):
     return final, intermediate
 
 
+def proposal_count(contract):
+    return int(read(lambda: contract.proposal_count(args=[]).call()))
+
+
+def propose_adaptation(contract, org_id, plan):
+    before = proposal_count(contract)
+    send(contract.propose_adaptation, [org_id, plan], value=BOND,
+         landed=lambda: int(contract.proposal_count(args=[]).call()) > before)
+    return proposal_count(contract)
+
+
 def propose_spend(contract, org_id, url, amount=100, mask=0b111, purpose="Ship Open Climate Data Toolkit 2.0"):
-    send(contract.propose_spend, [org_id, purpose, url, random_address(), amount, mask], value=BOND)
+    before = proposal_count(contract)
+    send(contract.propose_spend, [org_id, purpose, url, random_address(), amount, mask], value=BOND,
+         landed=lambda: int(contract.proposal_count(args=[]).call()) > before)
     pid = int(read(lambda: contract.proposal_count(args=[]).call()))
     p = read(lambda: contract.get_proposal(args=[pid]).call())
     assert p["status"] == "PENDING" and p["bond"] == BOND  # setup really happened
@@ -182,15 +217,13 @@ def test_adaptation_must_conform_to_the_charter():
     org_id = create_org(contract)
 
     good = "Also fund documentation efforts for open climate datasets."
-    send(contract.propose_adaptation, [org_id, good], value=BOND)
-    good_id = int(read(lambda: contract.proposal_count(args=[]).call()))
+    good_id = propose_adaptation(contract, org_id, good)
     p, _earlier = resolve_until_settled(contract, good_id)
     o = read(lambda: contract.get_org(args=[org_id]).call())
     assert p["status"] == "ADOPTED" and o["plan"] == good and o["plan_version"] == 2
 
     bad = "Pivot to buying surveillance drones and weapons for private clients."
-    send(contract.propose_adaptation, [org_id, bad], value=BOND)
-    bad_id = int(read(lambda: contract.proposal_count(args=[]).call()))
+    bad_id = propose_adaptation(contract, org_id, bad)
     p, _earlier = resolve_until_settled(contract, bad_id)
     o = read(lambda: contract.get_org(args=[org_id]).call())
     assert p["status"] != "ADOPTED" and p["verdict"] in ("VIOLATES", "UNCLEAR")
@@ -209,11 +242,13 @@ def test_funding_lapse_dormancy_dissolution_and_refund():
     assert read(lambda: contract.is_active(args=[org_id]).call()) is False
 
     # the 1-second grace period has passed by the time the next transaction lands
-    send(contract.heartbeat, [org_id])
+    send(contract.heartbeat, [org_id],
+         landed=lambda: contract.get_org(args=[org_id]).call()["status"] == "DISSOLVED")
     o = read(lambda: contract.get_org(args=[org_id]).call())
     assert o["status"] == "DISSOLVED" and o["refund_pool"] == 60
 
-    send(contract.claim_refund, [org_id])
+    send(contract.claim_refund, [org_id],
+         landed=lambda: contract.get_org(args=[org_id]).call()["refund_pool"] == 0)
     o = read(lambda: contract.get_org(args=[org_id]).call())
     assert o["refund_pool"] == 0 and o["refund_total"] == 0
     # a second claim has nothing left to take: it must not succeed and must not change state
